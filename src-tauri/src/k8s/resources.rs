@@ -128,17 +128,7 @@ pub async fn watch_resources(
             .await
             .map_err(|e: kube::runtime::watcher::Error| e.to_string())?
         {
-            let item = ResourceItem {
-                name: pod.metadata.name.clone().unwrap_or_default(),
-                namespace: pod.metadata.namespace.clone(),
-                age: pod
-                    .metadata
-                    .creation_timestamp
-                    .as_ref()
-                    .map(|t| t.0.to_rfc3339()),
-                status: pod.status.as_ref().and_then(|s| s.phase.clone()),
-                raw: serde_json::to_value(&pod).unwrap_or(Value::Null),
-            };
+            let item = to_resource_item(&pod);
             app.emit(&event_name, &item).map_err(|e| e.to_string())?;
         }
     } else {

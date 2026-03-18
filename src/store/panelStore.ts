@@ -4,16 +4,16 @@ import { PanelId, PanelState, ResourceType } from "../types/k8s";
 interface PanelStore {
   panels: PanelState[];
   splitDirection: "horizontal" | "vertical";
-  addPanel: (context: string) => void;
+  addPanel: (context: string, namespace?: string) => void;
   removePanel: (id: PanelId) => void;
   updatePanel: (id: PanelId, patch: Partial<PanelState>) => void;
   setSplitDirection: (dir: "horizontal" | "vertical") => void;
 }
 
-const createPanel = (context: string): PanelState => ({
+const createPanel = (context: string, namespace = "default"): PanelState => ({
   id: crypto.randomUUID(),
   resourceType: "pods" as ResourceType,
-  namespace: "default",
+  namespace,
   context,
   selectedResource: null,
   viewMode: "list",
@@ -22,10 +22,10 @@ const createPanel = (context: string): PanelState => ({
 export const usePanelStore = create<PanelStore>((set) => ({
   panels: [],
   splitDirection: "horizontal",
-  addPanel: (context) =>
+  addPanel: (context, namespace) =>
     set((s) => {
       if (s.panels.length >= 4) return s;
-      return { panels: [...s.panels, createPanel(context)] };
+      return { panels: [...s.panels, createPanel(context, namespace)] };
     }),
   removePanel: (id) =>
     set((s) => ({ panels: s.panels.filter((p) => p.id !== id) })),

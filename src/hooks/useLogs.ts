@@ -30,6 +30,7 @@ export function useLogs(
     });
 
     return () => {
+      invoke("cmd_stop_logs", { panelId }).catch(console.error);
       unlisten.then((fn) => fn());
     };
   }, [panelId, context, namespace, podName, container]);

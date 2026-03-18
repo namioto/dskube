@@ -1,11 +1,25 @@
+import { invoke } from "@tauri-apps/api/core";
 import { usePanelStore } from "../../store/panelStore";
 import { useClusterStore } from "../../store/clusterStore";
+import { useResourceStore } from "../../store/resourceStore";
 import Panel from "./Panel";
 
 export default function PanelContainer() {
   const { panels, splitDirection, addPanel, removePanel, setSplitDirection } =
     usePanelStore();
-  const currentContext = useClusterStore((s) => s.currentContext);
+  const { currentContext, currentNamespace } = useClusterStore();
+  const clearPanel = useResourceStore((s) => s.clearPanel);
+
+  const handleAddPanel = () => {
+    addPanel(currentContext, currentNamespace);
+  };
+
+  const handleRemovePanel = (panelId: string) => {
+    invoke("cmd_stop_watch", { panelId }).catch(console.error);
+    invoke("cmd_stop_logs", { panelId }).catch(console.error);
+    clearPanel(panelId);
+    removePanel(panelId);
+  };
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -36,7 +50,7 @@ export default function PanelContainer() {
             <span className="text-4xl">⎈</span>
             <p className="text-sm">패널을 추가하여 클러스터를 관리하세요</p>
             <button
-              onClick={() => addPanel(currentContext)}
+              onClick={handleAddPanel}
               className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 text-white text-sm transition-colors"
             >
               + 첫 패널 추가
@@ -48,7 +62,7 @@ export default function PanelContainer() {
       {/* Bottom toolbar */}
       <div className="flex items-center gap-2 px-4 py-1.5 bg-gray-800 border-t border-gray-700 text-xs shrink-0">
         <button
-          onClick={() => addPanel(currentContext)}
+          onClick={handleAddPanel}
           disabled={panels.length >= 4}
           className="px-2 py-1 bg-blue-600 rounded disabled:opacity-40 hover:bg-blue-500 transition-colors text-white"
         >
@@ -56,7 +70,8 @@ export default function PanelContainer() {
         </button>
         <button
           onClick={() =>
-            panels.length > 0 && removePanel(panels[panels.length - 1].id)
+            panels.length > 0 &&
+            handleRemovePanel(panels[panels.length - 1].id)
           }
           disabled={panels.length === 0}
           className="px-2 py-1 bg-gray-700 rounded disabled:opacity-40 hover:bg-gray-600 transition-colors text-gray-300"

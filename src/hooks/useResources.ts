@@ -53,6 +53,7 @@ export function useResources(
     );
 
     return () => {
+      invoke("cmd_stop_watch", { panelId }).catch(console.error);
       unlisten.then((fn) => fn());
     };
   }, [panelId, context, resourceType, namespace]);
