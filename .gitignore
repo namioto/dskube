@@ -5,3 +5,5 @@ src-tauri/target/
 landing/node_modules/
 .omc/
 node_modules/
+CLAUDE.md
+docs/superpowers/
