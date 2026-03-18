@@ -84,7 +84,14 @@ where
     K: kube::Resource + serde::Serialize,
     K::DynamicType: Default,
 {
-    let raw = serde_json::to_value(item).unwrap_or(Value::Null);
+    let mut raw = serde_json::to_value(item).unwrap_or(Value::Null);
+    // Strip sensitive fields from Secret objects
+    if K::kind(&K::DynamicType::default()) == "Secret" {
+        if let Some(obj) = raw.as_object_mut() {
+            obj.remove("data");
+            obj.remove("stringData");
+        }
+    }
     ResourceItem {
         name: item.meta().name.clone().unwrap_or_default(),
         namespace: item.meta().namespace.clone(),

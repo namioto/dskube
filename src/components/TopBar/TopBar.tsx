@@ -8,9 +8,11 @@ export default function TopBar() {
     contexts,
     currentContext,
     namespaces,
+    currentNamespace,
     setContexts,
     setCurrentContext,
     setNamespaces,
+    setCurrentNamespace,
   } = useClusterStore();
 
   useEffect(() => {
@@ -27,7 +29,10 @@ export default function TopBar() {
   useEffect(() => {
     if (!currentContext) return;
     invoke<string[]>("get_namespaces", { context: currentContext })
-      .then(setNamespaces)
+      .then((ns) => {
+        setNamespaces(ns);
+        if (ns.length > 0) setCurrentNamespace(ns[0]);
+      })
       .catch(console.error);
   }, [currentContext]);
 
@@ -53,7 +58,11 @@ export default function TopBar() {
       </div>
       <div className="flex items-center gap-2">
         <span className="text-gray-500 text-xs">namespace</span>
-        <select className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500">
+        <select
+          value={currentNamespace}
+          onChange={(e) => setCurrentNamespace(e.target.value)}
+          className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
+        >
           {namespaces.map((ns) => (
             <option key={ns} value={ns}>
               {ns}

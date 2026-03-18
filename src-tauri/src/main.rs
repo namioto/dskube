@@ -16,10 +16,12 @@ fn main() {
             get_namespaces,
             cmd_list_resources,
             cmd_watch_resources,
+            cmd_stop_watch,
             open_panel_window,
             get_panel_init_state,
             cmd_apply_resource,
             cmd_stream_logs,
+            cmd_stop_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

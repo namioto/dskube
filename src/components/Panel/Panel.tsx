@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { PanelState } from "../../types/k8s";
 import { usePanelStore } from "../../store/panelStore";
 import { useResourceStore } from "../../store/resourceStore";
+import { useClusterStore } from "../../store/clusterStore";
 import { useResources } from "../../hooks/useResources";
 import { useLogs } from "../../hooks/useLogs";
 import Sidebar from "../Sidebar/Sidebar";
@@ -17,6 +18,7 @@ interface Props {
 export default function Panel({ panel }: Props) {
   const { updatePanel } = usePanelStore();
   const resources = useResourceStore((s) => s.resources[panel.id] ?? []);
+  const { contexts, namespaces } = useClusterStore();
   const [logFilter, setLogFilter] = useState("");
 
   useResources(panel.id, panel.context, panel.resourceType, panel.namespace);
@@ -44,14 +46,26 @@ export default function Panel({ panel }: Props) {
           onChange={(e) => updatePanel(panel.id, { context: e.target.value })}
           className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs max-w-[120px] truncate"
         >
-          <option value={panel.context}>{panel.context || "no cluster"}</option>
+          {contexts.length === 0 ? (
+            <option value={panel.context}>{panel.context || "no cluster"}</option>
+          ) : (
+            contexts.map((ctx) => (
+              <option key={ctx.name} value={ctx.name}>{ctx.name}</option>
+            ))
+          )}
         </select>
         <select
           value={panel.namespace}
           onChange={(e) => updatePanel(panel.id, { namespace: e.target.value })}
           className="bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs"
         >
-          <option value={panel.namespace}>{panel.namespace}</option>
+          {namespaces.length === 0 ? (
+            <option value={panel.namespace}>{panel.namespace}</option>
+          ) : (
+            namespaces.map((ns) => (
+              <option key={ns} value={ns}>{ns}</option>
+            ))
+          )}
         </select>
         <div className="flex gap-1 ml-auto">
           {["list", "detail", "logs"].map((mode) => (
