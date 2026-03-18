@@ -10,6 +10,8 @@ jobs:
   build-macos-arm:
     runs-on: macos-latest
     name: macOS Apple Silicon
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
