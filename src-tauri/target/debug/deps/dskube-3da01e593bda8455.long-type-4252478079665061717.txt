@@ -1,1 +1,0 @@
-EventFlatten<impl Stream<Item = Result<kube::kube_runtime::watcher::Event<Pod>, kube::kube_runtime::watcher::Error>> + std::marker::Send, Pod>
