@@ -17,7 +17,7 @@ interface Props {
 
 export default function Panel({ panel }: Props) {
   const { updatePanel } = usePanelStore();
-  const resources = useResourceStore((s) => s.resources[panel.id] ?? []);
+  const resources = useResourceStore((s) => s.resources[panel.id]) ?? [];
   const { contexts, namespaces } = useClusterStore();
   const [logFilter, setLogFilter] = useState("");
 
