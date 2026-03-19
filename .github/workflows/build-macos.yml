@@ -7,9 +7,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Frontend Tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run tests
+        run: npm test
+
   build-macos-arm:
     runs-on: macos-latest
     name: macOS Apple Silicon
+    needs: test
     permissions:
       contents: write
 
@@ -28,6 +46,16 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > /tmp/tauri.conf.json
+          mv /tmp/tauri.conf.json src-tauri/tauri.conf.json
+          jq --arg v "$VERSION" '.version = $v' package.json > /tmp/package.json
+          mv /tmp/package.json package.json
+          echo "Building version $VERSION"
 
       - name: Install frontend dependencies
         run: npm ci
