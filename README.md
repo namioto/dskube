@@ -16,7 +16,7 @@ A native Kubernetes GUI for macOS — lightweight, fast, and built on Tauri + Ru
 - **Resource management** — list, inspect, and apply YAML for Pods, Deployments, Services, ConfigMaps, Secrets, and more
 - **kubeconfig integration** — auto-discovers `~/.kube/config`, switch clusters from the top bar
 - **Lightweight** — under 20 MB binary, no Electron, no Node.js runtime
-- **macOS native** — ships as a native app for Apple Silicon; no browser, no web server, behaves like a real desktop application
+- **macOS native** — ships as a native app for Apple Silicon (M1/M2/M3/M4); no browser, no web server, behaves like a real desktop application
 
 ## Download
 
