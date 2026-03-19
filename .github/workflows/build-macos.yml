@@ -32,13 +32,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build (with ad-hoc signing)
+        env:
+          APPLE_SIGNING_IDENTITY: "-"
         run: npm run tauri build -- --target aarch64-apple-darwin
-
-      - name: Ad-hoc sign
-        run: |
-          APP=$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -name "*.app" | head -1)
-          codesign --force --deep --sign - "$APP"
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
