@@ -794,7 +794,7 @@ footer {
 
   <div class="hero-badge reveal">
     <span class="hero-badge-dot"></span>
-    Early Access
+    v0.2.0 — Early Access
   </div>
 
   <h1 class="hero-title reveal reveal-delay-1">
@@ -920,6 +920,34 @@ footer {
       <div class="feature-desc">Ships as a native app for macOS Apple Silicon. No browser, no web server — behaves like a real desktop application.</div>
       <div class="feature-tag">macOS Apple Silicon</div>
     </div>
+
+    <div class="feature-card reveal">
+      <div class="feature-icon">⌨</div>
+      <div class="feature-title">Pod Exec</div>
+      <div class="feature-desc">Open an interactive terminal directly into any running Pod container. Built on xterm.js with full PTY support — no kubectl required.</div>
+      <div class="feature-tag">xterm.js · PTY</div>
+    </div>
+
+    <div class="feature-card reveal reveal-delay-1">
+      <div class="feature-icon">🔀</div>
+      <div class="feature-title">Port Forward</div>
+      <div class="feature-desc">Tunnel any Pod port to localhost in one click. Manage multiple active forwards simultaneously with start/stop controls.</div>
+      <div class="feature-tag">local port tunneling</div>
+    </div>
+
+    <div class="feature-card reveal reveal-delay-2">
+      <div class="feature-icon">🔐</div>
+      <div class="feature-title">RBAC Aware</div>
+      <div class="feature-desc">Checks your permissions via SelfSubjectAccessReview before showing destructive actions. Read-only users never see Apply or Delete buttons.</div>
+      <div class="feature-tag">SelfSubjectAccessReview</div>
+    </div>
+
+    <div class="feature-card reveal">
+      <div class="feature-icon">🧩</div>
+      <div class="feature-title">CRD Support</div>
+      <div class="feature-desc">Browse and manage Custom Resource Definitions alongside built-in resources. Inspect and edit any CRD instance with the YAML editor.</div>
+      <div class="feature-tag">custom resources</div>
+    </div>
   </div>
 </section>
 
@@ -988,6 +1016,30 @@ footer {
             <td class="highlight"><span class="check">✓</span></td>
             <td><span class="check">✓</span></td>
             <td><span class="cross">✕</span> paid</td>
+          </tr>
+          <tr>
+            <td>Pod exec (terminal)</td>
+            <td class="highlight"><span class="check">✓</span> built-in</td>
+            <td><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>Port forward UI</td>
+            <td class="highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+          </tr>
+          <tr>
+            <td>RBAC permission check</td>
+            <td class="highlight"><span class="check">✓</span></td>
+            <td><span class="cross">✕</span></td>
+            <td><span class="partial">~</span> limited</td>
+          </tr>
+          <tr>
+            <td>CRD / custom resources</td>
+            <td class="highlight"><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
+            <td><span class="check">✓</span></td>
           </tr>
         </tbody>
       </table>
