@@ -39,4 +39,38 @@ mod tests {
         let result = list_contexts();
         assert!(result.is_ok() || result.is_err());
     }
+
+    #[test]
+    fn test_context_info_fields() {
+        let ctx = ContextInfo {
+            name: "my-context".to_string(),
+            cluster: "my-cluster".to_string(),
+            namespace: Some("kube-system".to_string()),
+        };
+        assert_eq!(ctx.name, "my-context");
+        assert_eq!(ctx.cluster, "my-cluster");
+        assert_eq!(ctx.namespace, Some("kube-system".to_string()));
+    }
+
+    #[test]
+    fn test_context_info_optional_namespace() {
+        let ctx = ContextInfo {
+            name: "no-ns".to_string(),
+            cluster: "cluster".to_string(),
+            namespace: None,
+        };
+        assert!(ctx.namespace.is_none());
+    }
+
+    #[test]
+    fn test_context_info_clone() {
+        let ctx = ContextInfo {
+            name: "ctx".to_string(),
+            cluster: "cluster".to_string(),
+            namespace: None,
+        };
+        let cloned = ctx.clone();
+        assert_eq!(cloned.name, ctx.name);
+        assert_eq!(cloned.cluster, ctx.cluster);
+    }
 }

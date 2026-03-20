@@ -31,7 +31,7 @@ export default function PanelContainer() {
         {panels.map((panel, idx) => (
           <div
             key={panel.id}
-            className={`flex-1 overflow-hidden ${
+            className={`relative flex-1 overflow-hidden ${
               splitDirection === "horizontal" && idx < panels.length - 1
                 ? "border-r border-gray-700"
                 : ""
@@ -42,6 +42,13 @@ export default function PanelContainer() {
             }`}
             style={{ minWidth: 0, minHeight: 0 }}
           >
+            <button
+              onClick={() => handleRemovePanel(panel.id)}
+              className="absolute top-1 right-1 z-10 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-white hover:bg-gray-700 rounded text-xs"
+              title="패널 닫기"
+            >
+              ×
+            </button>
             <Panel panel={panel} />
           </div>
         ))}
@@ -67,16 +74,6 @@ export default function PanelContainer() {
           className="px-2 py-1 bg-blue-600 rounded disabled:opacity-40 hover:bg-blue-500 transition-colors text-white"
         >
           + 패널 추가
-        </button>
-        <button
-          onClick={() =>
-            panels.length > 0 &&
-            handleRemovePanel(panels[panels.length - 1].id)
-          }
-          disabled={panels.length === 0}
-          className="px-2 py-1 bg-gray-700 rounded disabled:opacity-40 hover:bg-gray-600 transition-colors text-gray-300"
-        >
-          패널 닫기
         </button>
         <div className="flex gap-1 ml-4">
           <button

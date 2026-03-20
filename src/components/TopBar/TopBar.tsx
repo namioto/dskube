@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useClusterStore } from "../../store/clusterStore";
-import { ContextInfo } from "../../types/k8s";
+import { usePanelStore } from "../../store/panelStore";
 
 export default function TopBar() {
   const {
@@ -9,29 +9,25 @@ export default function TopBar() {
     currentContext,
     namespaces,
     currentNamespace,
-    setContexts,
     setCurrentContext,
     setNamespaces,
     setCurrentNamespace,
   } = useClusterStore();
 
-  useEffect(() => {
-    invoke<ContextInfo[]>("get_contexts")
-      .then((ctxs) => {
-        setContexts(ctxs);
-        if (ctxs.length > 0 && !currentContext) {
-          setCurrentContext(ctxs[0].name);
-        }
-      })
-      .catch(console.error);
-  }, []);
+  const { panels, updatePanel } = usePanelStore();
 
   useEffect(() => {
     if (!currentContext) return;
     invoke<string[]>("get_namespaces", { context: currentContext })
       .then((ns) => {
         setNamespaces(ns);
-        if (ns.length > 0) setCurrentNamespace(ns[0]);
+        if (ns.length > 0) {
+          setCurrentNamespace(ns[0]);
+          const { panels, updatePanel } = usePanelStore.getState();
+          panels
+            .filter((panel) => panel.context === currentContext)
+            .forEach((panel) => updatePanel(panel.id, { namespace: ns[0] }));
+        }
       })
       .catch(console.error);
   }, [currentContext]);
@@ -43,7 +39,11 @@ export default function TopBar() {
         <span className="text-gray-500 text-xs">cluster</span>
         <select
           value={currentContext}
-          onChange={(e) => setCurrentContext(e.target.value)}
+          onChange={(e) => {
+            const ctx = e.target.value;
+            setCurrentContext(ctx);
+            panels.forEach((panel) => updatePanel(panel.id, { context: ctx }));
+          }}
           className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
         >
           {contexts.length === 0 && (
@@ -60,7 +60,13 @@ export default function TopBar() {
         <span className="text-gray-500 text-xs">namespace</span>
         <select
           value={currentNamespace}
-          onChange={(e) => setCurrentNamespace(e.target.value)}
+          onChange={(e) => {
+            const ns = e.target.value;
+            setCurrentNamespace(ns);
+            panels
+              .filter((panel) => panel.context === currentContext)
+              .forEach((panel) => updatePanel(panel.id, { namespace: ns }));
+          }}
           className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500"
         >
           {namespaces.map((ns) => (

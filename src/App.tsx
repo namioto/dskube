@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import TopBar from "./components/TopBar/TopBar";
 import PanelContainer from "./components/Panel/PanelContainer";
 import Panel from "./components/Panel/Panel";
+import Onboarding from "./components/Onboarding";
 import { usePanelStore } from "./store/panelStore";
 import { useClusterStore } from "./store/clusterStore";
-import { PanelState } from "./types/k8s";
+import { ContextInfo, PanelState } from "./types/k8s";
 
 // 분리된 창 컴포넌트
 function DetachedWindow({ panelId }: { panelId: string }) {
@@ -34,13 +35,46 @@ function DetachedWindow({ panelId }: { panelId: string }) {
 // 메인 앱
 function MainApp() {
   const { addPanel, panels } = usePanelStore();
-  const currentContext = useClusterStore((s) => s.currentContext);
+  const { contexts, currentContext } = useClusterStore();
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadContexts = () => {
+    setLoaded(false);
+    setLoadError(null);
+    return invoke<ContextInfo[]>("get_contexts")
+      .then((ctxs) => {
+        useClusterStore.getState().setContexts(ctxs);
+        if (ctxs.length > 0) {
+          const first = ctxs[0].name;
+          useClusterStore.getState().setCurrentContext(first);
+        }
+      })
+      .catch((e: unknown) => setLoadError(String(e)))
+      .finally(() => setLoaded(true));
+  };
+
+  useEffect(() => {
+    loadContexts();
+  }, []);
 
   useEffect(() => {
     if (currentContext && panels.length === 0) {
       addPanel(currentContext);
     }
   }, [currentContext]);
+
+  if (!loaded) {
+    return (
+      <div className="h-screen bg-gray-900 flex items-center justify-center text-gray-500 text-sm">
+        연결 중...
+      </div>
+    );
+  }
+
+  if (contexts.length === 0) {
+    return <Onboarding onRetry={loadContexts} error={loadError ?? undefined} />;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 overflow-hidden">

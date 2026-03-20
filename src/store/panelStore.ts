@@ -17,6 +17,7 @@ const createPanel = (context: string, namespace = "default"): PanelState => ({
   context,
   selectedResource: null,
   viewMode: "list",
+  selectedCrd: null,
 });
 
 export const usePanelStore = create<PanelStore>((set) => ({

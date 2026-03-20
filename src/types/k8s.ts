@@ -1,3 +1,12 @@
+export interface CrdInfo {
+  name: string;
+  kind: string;
+  group: string;
+  version: string;
+  plural: string;
+  namespaced: boolean;
+}
+
 export type ResourceType =
   | "pods"
   | "deployments"
@@ -8,7 +17,12 @@ export type ResourceType =
   | "daemonsets"
   | "ingress"
   | "namespaces"
-  | "nodes";
+  | "nodes"
+  | "jobs"
+  | "cronjobs"
+  | "persistentvolumes"
+  | "persistentvolumeclaims"
+  | "custom";
 
 export interface ContextInfo {
   name: string;
@@ -24,6 +38,11 @@ export interface ResourceItem {
   raw: Record<string, unknown>;
 }
 
+export interface ResourcePage {
+  items: ResourceItem[];
+  continue_token?: string;
+}
+
 export type PanelId = string;
 
 export interface PanelState {
@@ -32,5 +51,6 @@ export interface PanelState {
   namespace: string;
   context: string;
   selectedResource: ResourceItem | null;
-  viewMode: "list" | "detail" | "logs";
+  viewMode: "list" | "detail" | "logs" | "events" | "terminal";
+  selectedCrd?: CrdInfo | null;
 }

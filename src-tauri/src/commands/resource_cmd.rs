@@ -1,35 +1,6 @@
-use tauri::State;
+use tauri::{State, Emitter};
 use crate::state::AppState;
-use crate::k8s::resources::{list_resources, ResourceItem};
-
-/// Kubernetes kind → 복수형 매핑 (알려진 불규칙 형태 포함)
-fn kind_to_plural(kind: &str) -> Option<&'static str> {
-    match kind.to_lowercase().as_str() {
-        "pod" => Some("pods"),
-        "deployment" => Some("deployments"),
-        "service" => Some("services"),
-        "configmap" => Some("configmaps"),
-        "secret" => Some("secrets"),
-        "statefulset" => Some("statefulsets"),
-        "daemonset" => Some("daemonsets"),
-        "ingress" => Some("ingresses"),
-        "namespace" => Some("namespaces"),
-        "node" => Some("nodes"),
-        "replicaset" => Some("replicasets"),
-        "job" => Some("jobs"),
-        "cronjob" => Some("cronjobs"),
-        "persistentvolume" => Some("persistentvolumes"),
-        "persistentvolumeclaim" => Some("persistentvolumeclaims"),
-        _ => None,
-    }
-}
-
-/// 지원하는 resource type 목록
-const ALLOWED_KINDS: &[&str] = &[
-    "Pod", "Deployment", "Service", "ConfigMap", "Secret",
-    "StatefulSet", "DaemonSet", "Ingress", "Namespace", "Node",
-    "ReplicaSet", "Job", "CronJob", "PersistentVolume", "PersistentVolumeClaim",
-];
+use crate::k8s::resources::{list_resources, ResourcePage, resource_api_info, resource_api_info_by_kind};
 
 #[tauri::command]
 pub async fn cmd_list_resources(
@@ -37,9 +8,11 @@ pub async fn cmd_list_resources(
     context: String,
     resource_type: String,
     namespace: Option<String>,
-) -> Result<Vec<ResourceItem>, String> {
+    limit: Option<u32>,
+    continue_token: Option<String>,
+) -> Result<ResourcePage, String> {
     let client = state.get_or_create_client(&context).await?;
-    list_resources(client, &resource_type, namespace.as_deref()).await
+    list_resources(client, &resource_type, namespace.as_deref(), limit, continue_token).await
 }
 
 #[tauri::command]
@@ -62,10 +35,13 @@ pub async fn cmd_watch_resources(
     let client = state.get_or_create_client(&context).await?;
     let panel_id_task = panel_id.clone();
     let handle = tauri::async_runtime::spawn(async move {
-        let _ = crate::k8s::resources::watch_resources(
-            client, app, resource_type, namespace, panel_id_task, context,
+        if let Err(e) = crate::k8s::resources::watch_resources(
+            client, app.clone(), resource_type, namespace, panel_id_task.clone(),
         )
-        .await;
+        .await
+        {
+            let _ = app.emit(&format!("resource-error-{}", panel_id_task), e);
+        }
     });
 
     state.watch_handles.lock().await.insert(panel_id, handle);
@@ -140,10 +116,9 @@ pub async fn cmd_apply_resource(
         .ok_or("Missing 'kind' field")?
         .to_string();
 
-    // kind 허용 목록 검증
-    if !ALLOWED_KINDS.iter().any(|k| k.eq_ignore_ascii_case(&kind_str)) {
-        return Err(format!("Unsupported kind: '{}'. Allowed: {:?}", kind_str, ALLOWED_KINDS));
-    }
+    // resource_api_info_by_kind 로 kind 유효성 검증 + API 정보 한 번에 조회
+    let kind_info = resource_api_info_by_kind(&kind_str)
+        .ok_or_else(|| format!("Unsupported kind: '{}'", kind_str))?;
 
     let name = value["metadata"]["name"]
         .as_str()
@@ -164,9 +139,7 @@ pub async fn cmd_apply_resource(
         ("".to_string(), api_version.to_string())
     };
 
-    let plural = kind_to_plural(&kind_str)
-        .ok_or_else(|| format!("Unknown plural for kind: {}", kind_str))?
-        .to_string();
+    let plural = kind_info.plural.to_string();
 
     let ar = ApiResource {
         group,
@@ -175,10 +148,12 @@ pub async fn cmd_apply_resource(
         api_version: api_version.to_string(),
         plural,
     };
-
-    let api: kube::Api<DynamicObject> = match namespace {
-        Some(ns) => kube::Api::namespaced_with(client, &ns, &ar),
-        None => kube::Api::all_with(client, &ar),
+    let api: kube::Api<DynamicObject> = if kind_info.cluster_scoped {
+        kube::Api::all_with(client, &ar)
+    } else {
+        let ns = namespace
+            .ok_or("namespace is required in resource metadata for this type")?;
+        kube::Api::namespaced_with(client, &ns, &ar)
     };
 
     let patch: DynamicObject =
@@ -192,4 +167,219 @@ pub async fn cmd_apply_resource(
     .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+// ResourceApiInfo 및 resource_api_info 는 crate::k8s::resources 에서 import
+
+#[tauri::command]
+pub async fn cmd_delete_resource(
+    state: State<'_, AppState>,
+    context: String,
+    resource_type: String,
+    name: String,
+    namespace: Option<String>,
+) -> Result<(), String> {
+    use kube::api::{DynamicObject, DeleteParams};
+    use kube::core::ApiResource;
+
+    let info = resource_api_info(&resource_type)
+        .ok_or_else(|| format!("Unsupported resource type: {}", resource_type))?;
+    let client = state.get_or_create_client(&context).await?;
+    let ar = ApiResource {
+        group: info.group.to_string(),
+        version: info.version.to_string(),
+        kind: info.kind.to_string(),
+        api_version: info.api_version.to_string(),
+        plural: info.plural.to_string(),
+    };
+    let api: kube::Api<DynamicObject> = if info.cluster_scoped {
+        kube::Api::all_with(client, &ar)
+    } else {
+        let ns = namespace.as_deref()
+            .ok_or_else(|| format!("namespace is required to delete {}", resource_type))?;
+        kube::Api::namespaced_with(client, ns, &ar)
+    };
+    api.delete(&name, &DeleteParams::default())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn cmd_scale_resource(
+    state: State<'_, AppState>,
+    context: String,
+    resource_type: String,
+    name: String,
+    namespace: String,
+    replicas: u32,
+) -> Result<(), String> {
+    use kube::api::{DynamicObject, Patch, PatchParams};
+    use kube::core::ApiResource;
+
+    const MAX_REPLICAS: u32 = 1000;
+    if replicas > MAX_REPLICAS {
+        return Err(format!("replicas {} exceeds maximum allowed ({})", replicas, MAX_REPLICAS));
+    }
+    if !matches!(resource_type.as_str(), "deployments" | "statefulsets") {
+        return Err(format!("Scale not supported for: {}", resource_type));
+    }
+
+    let info = resource_api_info(&resource_type)
+        .ok_or_else(|| format!("Unsupported resource type: {}", resource_type))?;
+    let ar = ApiResource {
+        group: info.group.to_string(),
+        version: info.version.to_string(),
+        kind: info.kind.to_string(),
+        api_version: info.api_version.to_string(),
+        plural: info.plural.to_string(),
+    };
+
+    let client = state.get_or_create_client(&context).await?;
+    let api: kube::Api<DynamicObject> = kube::Api::namespaced_with(client, &namespace, &ar);
+    api.patch(&name, &PatchParams::default(), &Patch::Merge(&serde_json::json!({ "spec": { "replicas": replicas } })))
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::k8s::resources::ALL_RESOURCE_TYPES;
+
+    #[test]
+    fn test_kind_to_plural_known_kinds() {
+        assert_eq!(resource_api_info_by_kind("pod").map(|i| i.plural), Some("pods"));
+        assert_eq!(resource_api_info_by_kind("Pod").map(|i| i.plural), Some("pods"));
+        assert_eq!(resource_api_info_by_kind("deployment").map(|i| i.plural), Some("deployments"));
+        assert_eq!(resource_api_info_by_kind("ingress").map(|i| i.plural), Some("ingresses"));
+        assert_eq!(resource_api_info_by_kind("namespace").map(|i| i.plural), Some("namespaces"));
+        assert_eq!(resource_api_info_by_kind("node").map(|i| i.plural), Some("nodes"));
+        assert_eq!(resource_api_info_by_kind("service").map(|i| i.plural), Some("services"));
+        assert_eq!(resource_api_info_by_kind("configmap").map(|i| i.plural), Some("configmaps"));
+        assert_eq!(resource_api_info_by_kind("secret").map(|i| i.plural), Some("secrets"));
+    }
+
+    #[test]
+    fn test_kind_to_plural_case_insensitive() {
+        assert_eq!(resource_api_info_by_kind("POD").map(|i| i.plural), Some("pods"));
+        assert_eq!(resource_api_info_by_kind("Deployment").map(|i| i.plural), Some("deployments"));
+        assert_eq!(resource_api_info_by_kind("CONFIGMAP").map(|i| i.plural), Some("configmaps"));
+        assert_eq!(resource_api_info_by_kind("StatefulSet").map(|i| i.plural), Some("statefulsets"));
+    }
+
+    #[test]
+    fn test_kind_to_plural_unknown_returns_none() {
+        assert!(resource_api_info_by_kind("unknownresource").is_none());
+        assert!(resource_api_info_by_kind("").is_none());
+        assert!(resource_api_info_by_kind("customresource").is_none());
+    }
+
+    #[test]
+    fn test_allowed_kinds_contains_expected() {
+        assert!(resource_api_info_by_kind("Pod").is_some());
+        assert!(resource_api_info_by_kind("Deployment").is_some());
+        assert!(resource_api_info_by_kind("Service").is_some());
+        assert!(resource_api_info_by_kind("Namespace").is_some());
+        assert!(resource_api_info_by_kind("Node").is_some());
+    }
+
+    #[test]
+    fn test_kind_to_plural_statefulset_and_daemonset() {
+        assert_eq!(resource_api_info_by_kind("statefulset").map(|i| i.plural), Some("statefulsets"));
+        assert_eq!(resource_api_info_by_kind("daemonset").map(|i| i.plural), Some("daemonsets"));
+        assert_eq!(resource_api_info_by_kind("job").map(|i| i.plural), Some("jobs"));
+        assert_eq!(resource_api_info_by_kind("cronjob").map(|i| i.plural), Some("cronjobs"));
+    }
+
+    #[test]
+    fn test_kind_to_plural_pv_pvc() {
+        assert_eq!(resource_api_info_by_kind("persistentvolume").map(|i| i.plural), Some("persistentvolumes"));
+        assert_eq!(resource_api_info_by_kind("persistentvolumeclaim").map(|i| i.plural), Some("persistentvolumeclaims"));
+    }
+
+    #[test]
+    fn test_allowed_kinds_validation_logic() {
+        // resource_api_info_by_kind 로 kind 유효성 검증
+        assert!(resource_api_info_by_kind("Pod").is_some());
+        assert!(resource_api_info_by_kind("pod").is_some());
+        assert!(resource_api_info_by_kind("POD").is_some());
+        assert!(resource_api_info_by_kind("Deployment").is_some());
+        assert!(resource_api_info_by_kind("deployment").is_some());
+
+        assert!(resource_api_info_by_kind("CustomResource").is_none());
+        assert!(resource_api_info_by_kind("").is_none());
+        assert!(resource_api_info_by_kind("ReplicaSet").is_none());
+    }
+
+    #[test]
+    fn test_allowed_kinds_exact_list() {
+        // ALL_RESOURCE_TYPES 에 정확히 14개 항목이 있는지 확인
+        let expected_kinds = [
+            "Pod", "Deployment", "Service", "ConfigMap", "Secret",
+            "StatefulSet", "DaemonSet", "Ingress", "Namespace", "Node",
+            "Job", "CronJob", "PersistentVolume", "PersistentVolumeClaim",
+        ];
+        assert_eq!(ALL_RESOURCE_TYPES.len(), expected_kinds.len());
+        for kind in &expected_kinds {
+            assert!(resource_api_info_by_kind(kind).is_some(), "Missing kind: {}", kind);
+        }
+    }
+
+    #[test]
+    fn test_cluster_scoped_resources() {
+        assert!(resource_api_info("nodes").unwrap().cluster_scoped);
+        assert!(resource_api_info("namespaces").unwrap().cluster_scoped);
+        assert!(resource_api_info("persistentvolumes").unwrap().cluster_scoped);
+    }
+
+    #[test]
+    fn test_namespaced_resources() {
+        assert!(!resource_api_info("pods").unwrap().cluster_scoped);
+        assert!(!resource_api_info("deployments").unwrap().cluster_scoped);
+        assert!(!resource_api_info("services").unwrap().cluster_scoped);
+        assert!(!resource_api_info("configmaps").unwrap().cluster_scoped);
+        assert!(!resource_api_info("secrets").unwrap().cluster_scoped);
+        assert!(!resource_api_info("persistentvolumeclaims").unwrap().cluster_scoped);
+    }
+
+    #[test]
+    fn test_delete_resource_unsupported_type() {
+        assert!(resource_api_info("unknownkind").is_none());
+        assert!(resource_api_info("replicasets").is_none());
+        assert!(resource_api_info("").is_none());
+    }
+
+    #[test]
+    fn test_resource_api_info_known_types() {
+        let info = resource_api_info("pods").unwrap();
+        assert_eq!(info.kind, "Pod");
+        assert_eq!(info.group, "");
+        assert_eq!(info.plural, "pods");
+
+        let info = resource_api_info("deployments").unwrap();
+        assert_eq!(info.kind, "Deployment");
+        assert_eq!(info.group, "apps");
+        assert_eq!(info.api_version, "apps/v1");
+
+        let info = resource_api_info("ingress").unwrap();
+        assert_eq!(info.kind, "Ingress");
+        assert_eq!(info.plural, "ingresses");
+        assert_eq!(info.group, "networking.k8s.io");
+
+        let info = resource_api_info("jobs").unwrap();
+        assert_eq!(info.kind, "Job");
+        assert_eq!(info.group, "batch");
+    }
+
+    #[test]
+    fn test_scale_only_for_deployment_statefulset() {
+        let scalable = |rt: &str| matches!(rt, "deployments" | "statefulsets");
+        assert!(scalable("deployments"));
+        assert!(scalable("statefulsets"));
+        assert!(!scalable("pods"));
+        assert!(!scalable("services"));
+        assert!(!scalable("daemonsets"));
+    }
 }

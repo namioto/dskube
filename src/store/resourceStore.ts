@@ -5,6 +5,7 @@ interface ResourceStore {
   resources: Record<PanelId, ResourceItem[]>;
   setResources: (panelId: PanelId, items: ResourceItem[]) => void;
   updateResource: (panelId: PanelId, item: ResourceItem) => void;
+  removeResource: (panelId: PanelId, name: string, namespace?: string) => void;
   clearPanel: (panelId: PanelId) => void;
 }
 
@@ -22,6 +23,14 @@ export const useResourceStore = create<ResourceStore>((set) => ({
         idx >= 0
           ? list.map((r, i) => (i === idx ? item : r))
           : [...list, item];
+      return { resources: { ...s.resources, [panelId]: updated } };
+    }),
+  removeResource: (panelId, name, namespace) =>
+    set((s) => {
+      const list = s.resources[panelId] ?? [];
+      const updated = list.filter(
+        (r) => !(r.name === name && r.namespace === namespace)
+      );
       return { resources: { ...s.resources, [panelId]: updated } };
     }),
   clearPanel: (panelId) =>

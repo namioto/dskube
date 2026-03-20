@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "dskube main window and panel windows",
+  "windows": ["main", "panel-*"],
+  "permissions": [
+    "core:event:default",
+    "core:window:default",
+    "core:app:default",
+    "core:resources:default",
+    "core:webview:allow-create-webview-window"
+  ]
+}

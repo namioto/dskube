@@ -82,4 +82,38 @@ describe("resourceStore", () => {
     const ref2 = useResourceStore.getState().resources["p1"];
     expect(ref1).toBe(ref2);
   });
+
+  // ── removeResource ──────────────────────────────────────────────────────
+  it("removeResource removes item matched by name and namespace", () => {
+    useResourceStore.getState().setResources("p1", [ITEM_A, ITEM_B]);
+    useResourceStore.getState().removeResource("p1", "pod-a", "default");
+    const items = useResourceStore.getState().resources["p1"];
+    expect(items).toHaveLength(1);
+    expect(items[0].name).toBe("pod-b");
+  });
+
+  it("removeResource removes item when namespace is undefined", () => {
+    const ITEM_NO_NS = { name: "pod-c", namespace: undefined, status: "Running", raw: {} };
+    useResourceStore.getState().setResources("p1", [ITEM_A, ITEM_NO_NS]);
+    useResourceStore.getState().removeResource("p1", "pod-c", undefined);
+    const items = useResourceStore.getState().resources["p1"];
+    expect(items).toHaveLength(1);
+    expect(items[0].name).toBe("pod-a");
+  });
+
+  it("removeResource does not throw when item does not exist", () => {
+    useResourceStore.getState().setResources("p1", [ITEM_A]);
+    expect(() =>
+      useResourceStore.getState().removeResource("p1", "nonexistent", "default")
+    ).not.toThrow();
+    expect(useResourceStore.getState().resources["p1"]).toHaveLength(1);
+  });
+
+  it("removeResource does not affect other panels", () => {
+    useResourceStore.getState().setResources("p1", [ITEM_A]);
+    useResourceStore.getState().setResources("p2", [ITEM_A, ITEM_B]);
+    useResourceStore.getState().removeResource("p2", "pod-a", "default");
+    expect(useResourceStore.getState().resources["p1"]).toHaveLength(1);
+    expect(useResourceStore.getState().resources["p2"]).toHaveLength(1);
+  });
 });

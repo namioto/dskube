@@ -17,8 +17,19 @@ export default function LogViewer({ lines, error, filter }: Props) {
   }, [lines.length, autoScroll]);
 
   const filtered = filter
-    ? lines.filter((l) => l.includes(filter))
+    ? lines.filter((l) => l.toLowerCase().includes(filter.toLowerCase()))
     : lines;
+
+  const handleDownload = () => {
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `logs_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (error) {
     return (
@@ -41,6 +52,13 @@ export default function LogViewer({ lines, error, filter }: Props) {
           />
           Auto-scroll
         </label>
+        <button
+          onClick={handleDownload}
+          className="px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+          title="Download logs"
+        >
+          Download
+        </button>
       </div>
       <div className="flex-1 bg-black text-green-400 font-mono text-xs overflow-auto p-2">
         {filtered.map((line, i) => (

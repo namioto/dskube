@@ -7,7 +7,8 @@ export function useLogs(
   context: string,
   namespace: string,
   podName: string,
-  container?: string
+  container?: string,
+  tailLines?: number
 ) {
   const [lines, setLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,7 @@ export function useLogs(
       podName,
       container,
       panelId,
+      tailLines,
     }).catch((e) => setError(String(e)));
 
     const unlisten = listen<string>(`log-line-${panelId}`, (event) => {
@@ -33,7 +35,7 @@ export function useLogs(
       invoke("cmd_stop_logs", { panelId }).catch(console.error);
       unlisten.then((fn) => fn());
     };
-  }, [panelId, context, namespace, podName, container]);
+  }, [panelId, context, namespace, podName, container, tailLines]);
 
   return { lines, error };
 }
